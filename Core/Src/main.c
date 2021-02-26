@@ -151,7 +151,7 @@ int main(void)
   // Returns:
   //      Nothing.
   //
-  PIDInit(&pid, 0.2/*kp*/, 0.02*18000.0/*ki*/, 0.0/*kd*/,
+  PIDInit(&pid, 0.2/*kp*/, 0.05*18000.0/*ki*/, 0.0/*kd*/,
 		  1.0/18000.0/*sampleTimeSeconds*/,
 		  0.0/*minOutput*/, 1.0/*maxOutput*/,
 		  AUTOMATIC /*mode*/, DIRECT /*controllerDirection*/);
@@ -381,8 +381,8 @@ static void MX_TIM1_Init(void)
   /* USER CODE END TIM1_Init 1 */
   htim1.Instance = TIM1;
   htim1.Init.Prescaler = 0;
-  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 9333;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_CENTERALIGNED1;
+  htim1.Init.Period = 4667;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -608,7 +608,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 	if(duty < DUTY_LIMIT) duty = DUTY_LIMIT;
 	else if (duty > 1.0-DUTY_LIMIT) duty = 1.0 - DUTY_LIMIT;
 
-	TIM1->CCR1 = (uint16_t) (duty * 9333.0);
+	TIM1->CCR1 = (uint16_t) (duty * 9333.0/2);
 	//TIM1->CCR1 = (uint32_t)(AD_RES[5]<<4) * 9333 / 65535;
 	TIM1->CCR2 = (uint32_t)(AD_RES[5]<<4) * 9333 / 65535;
 	TIM1->CCR3 = (uint32_t)(AD_RES[0]<<4) * 9333 / 65535;
