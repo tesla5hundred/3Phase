@@ -13,7 +13,7 @@
 #define	ADC_MAX		((1 << ADC_BITS) - 1)
 
 #define	ISENSE_GAIN	213.48		//Gain of current sensor in units of ADC counts per amp
-#define	VSENSE_FS	73.125		//Full scale range of the voltage sense divider
+#define	VSENSE_FS	80.04		//Full scale range of the voltage sense divider
 
 
 #endif /* INC_SYSTEMDEFINES_H_ */

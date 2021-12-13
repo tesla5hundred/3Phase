@@ -153,12 +153,12 @@ int main(void)
   // Returns:
   //      Nothing.
   //
-  PIDInit(&voltagePid, 0.5/*kp*/, 0.05*18000.0/*ki*/, 0.0/18000.0/*kd*/,
+  PIDInit(&voltagePid, 0.08/*kp*/, 0.02*18000.0/*ki*/, 0.0/18000.0/*kd*/,
 		  1.0/18000.0/*sampleTimeSeconds*/,
 		  -48.0/*minOutput*/, 48.0/*maxOutput*/,
 		  AUTOMATIC /*mode*/, DIRECT /*controllerDirection*/);
 
-  PIDInit(&pid, 0.1/*kp*/, 0.005*18000.0/*ki*/, 0.0 / 18000.0/*kd*/,
+  PIDInit(&pid, 5.0/*kp*/, 0.5*18000.0/*ki*/, 0.0 / 18000.0/*kd*/,
 		  1.0/18000.0/*sampleTimeSeconds*/,
 		  -1.0/*minOutput*/, 1.0/*maxOutput*/,
 		  AUTOMATIC /*mode*/, DIRECT /*controllerDirection*/);
@@ -277,7 +277,7 @@ static void MX_ADC1_Init(void)
   }
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_3;
+  sConfig.Channel = ADC_CHANNEL_4;
   sConfig.Rank = 2;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -389,11 +389,11 @@ static void MX_TIM1_Init(void)
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
   sConfigOC.Pulse = 1024;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_LOW;
-  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_LOW;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  sConfigOC.OCIdleState = TIM_OCIDLESTATE_SET;
-  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_SET;
+  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
+  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
   if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
   {
     Error_Handler();
@@ -411,7 +411,7 @@ static void MX_TIM1_Init(void)
   sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
   sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
   sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
-  sBreakDeadTimeConfig.DeadTime = 0;
+  sBreakDeadTimeConfig.DeadTime = 82;
   sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
   sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
   sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
@@ -574,10 +574,10 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 #define square_wave(x) ((x < M_PI) ? 1.0 : -1.0)
-
+#define VOLTAGE_MODE
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
-	static float theta, vOut = 4.0, ffGain = 0.5;
+	static float theta, vOut = 8.0, ffGain = 0.0;
 	float setpoint;
 	float iRef;
 
@@ -585,13 +585,21 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 
 	setpoint = (float)AD_RES[5] / ADC_MAX;
 
-	setpoint = (vOut*1.414*square_wave(theta) + 30) / VSENSE_FS;
+#ifdef VOLTAGE_MODE
+
+
+	setpoint = (vOut*1.414*sin(theta) + 24) / VSENSE_FS;
 	PIDSetpointSet(&voltagePid, setpoint);
-	PIDInputSet(&voltagePid, (float)AD_RES[2] / ADC_MAX);
+	PIDInputSet(&voltagePid, (float)AD_RES[1] / ADC_MAX);
 
 	PIDCompute(&voltagePid);
 
-	iRef = PIDOutputGet(&voltagePid);
+	iRef = -PIDOutputGet(&voltagePid);
+
+#else
+	iRef = square_wave(theta)*1/(2.0*75.0) + setpoint;
+#endif
+
 
 	PIDSetpointSet(&pid, iRef);
 	PIDInputSet(&pid, (float)AD_RES[0] / ADC_MAX);
