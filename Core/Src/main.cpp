@@ -120,7 +120,7 @@ int main(void)
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
 
-  pid_i.setOutputRange(0, 4095);
+  pid_i.setOutputRange(140, (9333/2) - 140);
   if (pid_i.err())
   {
 
@@ -617,7 +617,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 
 
 #ifdef INTEGER_PID
-	float duty = (float)pid_i.step(iRef*4095.0, AD_RES[0]) / 4095.0;
+	TIM1->CCR1 = (uint16_t)pid_i.step(iRef*4095.0, AD_RES[0]);
 #else
 
 	PIDSetpointSet((PIDControl *)&pid, iRef);
@@ -627,13 +627,15 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 
 	float duty = PIDOutputGet((PIDControl *)&pid) + ffGain*setpoint;
 
-#endif
-
-	#define DUTY_LIMIT	0.03
+#define DUTY_LIMIT	0.03
 	if(duty < DUTY_LIMIT) duty = DUTY_LIMIT;
 	else if (duty > 1.0-DUTY_LIMIT) duty = 1.0 - DUTY_LIMIT;
 
 	TIM1->CCR1 = (uint16_t) (duty * 9333.0/2);
+
+#endif
+
+
 	//TIM1->CCR1 = (uint32_t)(AD_RES[5]<<4) * 9333 / 65535;
 	TIM1->CCR2 = (uint32_t)(AD_RES[5]<<4) * 9333 / 65535;
 	TIM1->CCR3 = (uint32_t)(AD_RES[0]<<4) * 9333 / 65535;
