@@ -25,6 +25,7 @@
 #include "systemDefines.h"
 #include "pid_controller.h"
 #include "math.h"
+#include "FastPID.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -55,6 +56,12 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 /* USER CODE BEGIN PV */
 volatile uint16_t AD_RES[6] = {0};
+
+float Kp=5, Ki=0.5*18000, Kd=0.0, Hz=18000;
+int output_bits = 16;
+bool output_signed = true;
+
+FastPID pid_i(Kp, Ki, Kd, Hz, output_bits, output_signed);
 volatile PIDControl pid;
 volatile PIDControl voltagePid;
 /* USER CODE END PV */
@@ -113,6 +120,14 @@ int main(void)
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
 
+  pid_i.setOutputRange(0, 4095);
+  if (pid_i.err())
+  {
+
+	  for (;;) {};
+  }
+
+
 
   //Start Timer1 interrupts
   HAL_TIM_PWM_Start_IT(&htim1, TIM_CHANNEL_1);
@@ -153,12 +168,12 @@ int main(void)
   // Returns:
   //      Nothing.
   //
-  PIDInit(&voltagePid, 0.08/*kp*/, 0.02*18000.0/*ki*/, 0.0/18000.0/*kd*/,
+  PIDInit((PIDControl *)&voltagePid, 0.08/*kp*/, 0.02*18000.0/*ki*/, 0.0/18000.0/*kd*/,
 		  1.0/18000.0/*sampleTimeSeconds*/,
-		  -48.0/*minOutput*/, 48.0/*maxOutput*/,
+		  -1.0/*minOutput*/, 1.0/*maxOutput*/,
 		  AUTOMATIC /*mode*/, DIRECT /*controllerDirection*/);
 
-  PIDInit(&pid, 5.0/*kp*/, 0.5*18000.0/*ki*/, 0.0 / 18000.0/*kd*/,
+  PIDInit((PIDControl *)&pid, 5.0/*kp*/, 0.5*18000.0/*ki*/, 0.0 / 18000.0/*kd*/,
 		  1.0/18000.0/*sampleTimeSeconds*/,
 		  -1.0/*minOutput*/, 1.0/*maxOutput*/,
 		  AUTOMATIC /*mode*/, DIRECT /*controllerDirection*/);
@@ -575,12 +590,12 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 #define square_wave(x) ((x < M_PI) ? 1.0 : -1.0)
 #define VOLTAGE_MODE
+#define INTEGER_PID
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
 	static float theta, vOut = 8.0, ffGain = 0.0;
 	float setpoint;
 	float iRef;
-
 	HAL_GPIO_TogglePin(GPIOTest_GPIO_Port, GPIOTest_Pin);
 
 	setpoint = (float)AD_RES[5] / ADC_MAX;
@@ -589,24 +604,30 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 
 
 	setpoint = (vOut*1.414*sin(theta) + 24) / VSENSE_FS;
-	PIDSetpointSet(&voltagePid, setpoint);
-	PIDInputSet(&voltagePid, (float)AD_RES[1] / ADC_MAX);
+	PIDSetpointSet((PIDControl *)&voltagePid, setpoint);
+	PIDInputSet((PIDControl *)&voltagePid, (float)AD_RES[1] / ADC_MAX);
 
-	PIDCompute(&voltagePid);
+	PIDCompute((PIDControl *)&voltagePid);
 
-	iRef = -PIDOutputGet(&voltagePid);
+	iRef = -PIDOutputGet((PIDControl *)&voltagePid);
 
 #else
 	iRef = square_wave(theta)*1/(2.0*75.0) + setpoint;
 #endif
 
 
-	PIDSetpointSet(&pid, iRef);
-	PIDInputSet(&pid, (float)AD_RES[0] / ADC_MAX);
+#ifdef INTEGER_PID
+	float duty = (float)pid_i.step(iRef*4095.0, AD_RES[0]) / 4095.0;
+#else
 
-	PIDCompute(&pid);
+	PIDSetpointSet((PIDControl *)&pid, iRef);
+	PIDInputSet((PIDControl *)&pid, (float)AD_RES[0] / ADC_MAX);
 
-	float duty = PIDOutputGet(&pid) + ffGain*setpoint;
+	PIDCompute((PIDControl *)&pid);
+
+	float duty = PIDOutputGet((PIDControl *)&pid) + ffGain*setpoint;
+
+#endif
 
 	#define DUTY_LIMIT	0.03
 	if(duty < DUTY_LIMIT) duty = DUTY_LIMIT;
