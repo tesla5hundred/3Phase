@@ -25,7 +25,8 @@
 #include "systemDefines.h"
 #include "pid_controller.h"
 #include "math.h"
-#include "FastPID.h"
+//#include "FastPID.h"
+#include "inverter.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -56,12 +57,17 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 /* USER CODE BEGIN PV */
 volatile uint16_t AD_RES[6] = {0};
-
+/*
 float Kp=5, Ki=0.5*18000, Kd=0.0, Hz=18000;
 int output_bits = 16;
 bool output_signed = true;
 
 FastPID pid_i(Kp, Ki, Kd, Hz, output_bits, output_signed);
+
+float Kp_v=0.08, Ki_v=0.02*18000, Kd_v=0.0;
+
+FastPID pid_v(Kp_v, Ki_v, Kd_v, Hz, output_bits, output_signed);
+*/
 volatile PIDControl pid;
 volatile PIDControl voltagePid;
 /* USER CODE END PV */
@@ -120,24 +126,36 @@ int main(void)
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
 
-  pid_i.setOutputRange(140, (9333/2) - 140);
+
+  inverterInit();
+  /*
+  pid_i.setOutputRange(42, PWM_FS - 42);
+
   if (pid_i.err())
   {
 
 	  for (;;) {};
   }
 
+  pid_v.setOutputRange(0, ADC_MAX);
 
+  if (pid_v.err())
+  {
+
+	  for (;;) {};
+  }
+*/
 
   //Start Timer1 interrupts
-  HAL_TIM_PWM_Start_IT(&htim1, TIM_CHANNEL_1);
+  //HAL_TIM_PWM_Start_IT(&htim1, TIM_CHANNEL_1);
+  HAL_TIM_Base_Start_IT(&htim1);
   HAL_TIMEx_OCN_Start(&htim1, TIM_CHANNEL_1);
 
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
 
-  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)&AD_RES, 6);
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)&AD_RES, 3);
 
 
   //*********************************************************************************
@@ -379,7 +397,7 @@ static void MX_TIM1_Init(void)
   htim1.Instance = TIM1;
   htim1.Init.Prescaler = 0;
   htim1.Init.CounterMode = TIM_COUNTERMODE_CENTERALIGNED1;
-  htim1.Init.Period = 4667;
+  htim1.Init.Period = 4666;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -596,9 +614,17 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 	static float theta, vOut = 8.0, ffGain = 0.0;
 	float setpoint;
 	float iRef;
-	HAL_GPIO_TogglePin(GPIOTest_GPIO_Port, GPIOTest_Pin);
+	HAL_GPIO_WritePin(GPIOTest_GPIO_Port, GPIOTest_Pin, GPIO_PIN_SET);
 
-	setpoint = (float)AD_RES[5] / ADC_MAX;
+
+#ifdef INTEGER_PID
+	loop(AD_RES[1], AD_RES[0]);
+/*
+	int16_t iref =  (uint16_t)pid_v.step((uint16_t)((8.0*sin(theta)+24.0)*50.0), AD_RES[1]);	//Setpoint scaling: 0 = 0V,  4095 = 83V; 50 = 1V
+
+	TIM1->CCR1 = (uint16_t)pid_i.step(ADC_MAX - iref, AD_RES[0]);	//Fix polarity of Iref
+*/
+#else
 
 #ifdef VOLTAGE_MODE
 
@@ -616,10 +642,6 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 #endif
 
 
-#ifdef INTEGER_PID
-	TIM1->CCR1 = (uint16_t)pid_i.step(iRef*4095.0, AD_RES[0]);
-#else
-
 	PIDSetpointSet((PIDControl *)&pid, iRef);
 	PIDInputSet((PIDControl *)&pid, (float)AD_RES[0] / ADC_MAX);
 
@@ -636,17 +658,38 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 #endif
 
 
-	//TIM1->CCR1 = (uint32_t)(AD_RES[5]<<4) * 9333 / 65535;
-	TIM1->CCR2 = (uint32_t)(AD_RES[5]<<4) * 9333 / 65535;
-	TIM1->CCR3 = (uint32_t)(AD_RES[0]<<4) * 9333 / 65535;
+//	TIM1->CCR1 = PWM_FS/2;
+//	TIM1->CCR2 = (uint32_t)(AD_RES[5]<<4) * PWM_FS / 65535;
+//	TIM1->CCR3 = (uint32_t)(AD_RES[0]<<4) * PWM_FS / 65535;
 
-	HAL_GPIO_TogglePin(GPIOTest_GPIO_Port, GPIOTest_Pin);
-
-	theta += 0.020944;
+	HAL_GPIO_WritePin(GPIOTest_GPIO_Port, GPIOTest_Pin, GPIO_PIN_RESET);
+/*
+	theta += 2*M_PI*60.0*2.0*(float)PWM_FS/(float)PWM_CLK;
 	if(theta >= 2*M_PI)
 		theta -= 2*M_PI;
+		*/
 }
 
+
+void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef* htim)
+{
+    //HAL_GPIO_TogglePin(GPIOTest_GPIO_Port, GPIOTest_Pin);
+}
+void timCap()
+{
+
+//	HAL_GPIO_TogglePin(GPIOTest_GPIO_Port, GPIOTest_Pin);
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {timCap();}
+void HAL_TIM_PeriodElapsedHalfCpltCallback(TIM_HandleTypeDef *htim) {timCap();}
+void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim) {timCap();}
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {timCap();}
+void HAL_TIM_IC_CaptureHalfCpltCallback(TIM_HandleTypeDef *htim) {timCap();}
+void HAL_TIM_PWM_PulseFinishedHalfCpltCallback(TIM_HandleTypeDef *htim) {timCap();}
+void HAL_TIM_TriggerCallback(TIM_HandleTypeDef *htim) {timCap();}
+void HAL_TIM_TriggerHalfCpltCallback(TIM_HandleTypeDef *htim) {timCap();}
+void HAL_TIM_ErrorCallback(TIM_HandleTypeDef *htim) {timCap();}
 
 
 /* USER CODE END 4 */

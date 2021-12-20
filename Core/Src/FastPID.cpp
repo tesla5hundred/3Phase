@@ -96,10 +96,10 @@ int16_t FastPID::step(int16_t sp, int16_t fb) {
     else if (_sum < INTEG_MIN)
       _sum = INTEG_MIN;
 
-    if (_sum > 327600)
-      _sum = 327600;
-    else if (_sum < -327600)
-      _sum = -327600;
+    if (_sum > 327600*4)	//kp*PARAM_MULT*OUTMAX
+      _sum = 327600*4;
+    else if (_sum < -327600*4)
+      _sum = -327600*4;
 
     // int32
     I = _sum;
