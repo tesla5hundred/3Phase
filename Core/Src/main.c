@@ -289,8 +289,8 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ScanConvMode = ENABLE;
   hadc1.Init.ContinuousConvMode = DISABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
-  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_RISING;
-  hadc1.Init.ExternalTrigConv = ADC_EXTERNALTRIGCONV_T1_CC1;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc1.Init.NbrOfConversion = 3;
   hadc1.Init.DMAContinuousRequests = ENABLE;
@@ -397,9 +397,9 @@ static void MX_TIM1_Init(void)
   htim1.Instance = TIM1;
   htim1.Init.Prescaler = 0;
   htim1.Init.CounterMode = TIM_COUNTERMODE_CENTERALIGNED1;
-  htim1.Init.Period = 4666;
+  htim1.Init.Period = 1166;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim1.Init.RepetitionCounter = 0;
+  htim1.Init.RepetitionCounter = 1;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
   {
@@ -611,14 +611,19 @@ static void MX_GPIO_Init(void)
 #define INTEGER_PID
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
-	static float theta, vOut = 8.0, ffGain = 0.0;
-	float setpoint;
-	float iRef;
-	HAL_GPIO_WritePin(GPIOTest_GPIO_Port, GPIOTest_Pin, GPIO_PIN_SET);
+//	static float theta, vOut = 8.0, ffGain = 0.0;
+//	float setpoint;
+//	float iRef;
+//	HAL_GPIO_WritePin(GPIOTest_GPIO_Port, GPIOTest_Pin, GPIO_PIN_SET);
 
 
+	//7.4us to get to here from ADC conversion start
+	//4.7 opt
 #ifdef INTEGER_PID
-	loop(AD_RES[1], AD_RES[0]);
+	loop(AD_RES[1], AD_RES[0], AD_RES[2]);
+	HAL_GPIO_WritePin(GPIOTest_GPIO_Port, GPIOTest_Pin, GPIO_PIN_RESET);
+	//12.2us to get to here from ADC conversion start
+	//7us opt
 /*
 	int16_t iref =  (uint16_t)pid_v.step((uint16_t)((8.0*sin(theta)+24.0)*50.0), AD_RES[1]);	//Setpoint scaling: 0 = 0V,  4095 = 83V; 50 = 1V
 
@@ -662,7 +667,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 //	TIM1->CCR2 = (uint32_t)(AD_RES[5]<<4) * PWM_FS / 65535;
 //	TIM1->CCR3 = (uint32_t)(AD_RES[0]<<4) * PWM_FS / 65535;
 
-	HAL_GPIO_WritePin(GPIOTest_GPIO_Port, GPIOTest_Pin, GPIO_PIN_RESET);
+
 /*
 	theta += 2*M_PI*60.0*2.0*(float)PWM_FS/(float)PWM_CLK;
 	if(theta >= 2*M_PI)
@@ -671,25 +676,13 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 }
 
 
-void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef* htim)
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-    //HAL_GPIO_TogglePin(GPIOTest_GPIO_Port, GPIOTest_Pin);
-}
-void timCap()
-{
+	HAL_GPIO_WritePin(GPIOTest_GPIO_Port, GPIOTest_Pin, GPIO_PIN_SET);
+	HAL_ADC_Start(&hadc1);
 
 //	HAL_GPIO_TogglePin(GPIOTest_GPIO_Port, GPIOTest_Pin);
 }
-
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {timCap();}
-void HAL_TIM_PeriodElapsedHalfCpltCallback(TIM_HandleTypeDef *htim) {timCap();}
-void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim) {timCap();}
-void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {timCap();}
-void HAL_TIM_IC_CaptureHalfCpltCallback(TIM_HandleTypeDef *htim) {timCap();}
-void HAL_TIM_PWM_PulseFinishedHalfCpltCallback(TIM_HandleTypeDef *htim) {timCap();}
-void HAL_TIM_TriggerCallback(TIM_HandleTypeDef *htim) {timCap();}
-void HAL_TIM_TriggerHalfCpltCallback(TIM_HandleTypeDef *htim) {timCap();}
-void HAL_TIM_ErrorCallback(TIM_HandleTypeDef *htim) {timCap();}
 
 
 /* USER CODE END 4 */

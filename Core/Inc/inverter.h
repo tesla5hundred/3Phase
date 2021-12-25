@@ -17,7 +17,7 @@
 #include <stdint.h>
 
 EXTERNC void inverterInit(void);
-EXTERNC void loop(uint16_t iMeas, uint16_t vMeas);
+EXTERNC void loop(uint16_t vMeas, uint16_t iMeas, uint16_t forceIRef);
 
 
 #endif /* INC_INVERTER_H_ */

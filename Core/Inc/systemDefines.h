@@ -17,6 +17,6 @@
 #define	ISENSE_GAIN	213.48		//Gain of current sensor in units of ADC counts per amp
 #define	VSENSE_FS	80.04		//Full scale range of the voltage sense divider
 
-#define PWM_FS		(4666)	//Value that represents 100% PWM duty
+#define PWM_FS		(1166)	//Value that represents 100% PWM duty
 
 #endif /* INC_SYSTEMDEFINES_H_ */
