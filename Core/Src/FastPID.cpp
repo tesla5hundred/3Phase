@@ -14,7 +14,8 @@ bool FastPID::setCoefficients(float kp, float ki, float kd, float hz) {
   _p = floatToParam(kp);
   _i = floatToParam(ki / hz);
   _d = floatToParam(kd * hz);
-  return ! _cfg_err;
+
+    return ! _cfg_err;
 }
 
 bool FastPID::setOutputConfig(int bits, bool sign) {
@@ -47,6 +48,9 @@ bool FastPID::setOutputRange(int16_t min, int16_t max)
   }
   _outmin = int64_t(min) * PARAM_MULT;
   _outmax = int64_t(max) * PARAM_MULT;
+
+  _sumLimit = _outmax;	//TODO: check abs(_outmin) as well. 2DO: make _sumLimit match asymmetrical limits (ie not centered around zero)
+
   return ! _cfg_err;
 }
 
@@ -90,16 +94,11 @@ int16_t FastPID::step(int16_t sp, int16_t fb) {
     // int17 * int16 = int33
     _sum += int64_t(err) * int64_t(_i);
 
-    // Limit sum to 32-bit signed value so that it saturates, never overflows.
-    if (_sum > INTEG_MAX)
-      _sum = INTEG_MAX;
-    else if (_sum < INTEG_MIN)
-      _sum = INTEG_MIN;
-
-    if (_sum > 327600*4)	//kp*PARAM_MULT*OUTMAX
-      _sum = 327600*4;
-    else if (_sum < -327600*4)
-      _sum = -327600*4;
+    // Limit sum
+    if (_sum > _sumLimit)
+      _sum = _sumLimit;
+    else if (_sum < -_sumLimit)
+      _sum = -_sumLimit;
 
     // int32
     I = _sum;

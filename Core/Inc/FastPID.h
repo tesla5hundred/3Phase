@@ -51,7 +51,7 @@ private:
 
   // Configuration
   uint32_t _p, _i, _d;
-  int64_t _outmax, _outmin; 
+  int64_t _outmax, _outmin, _sumLimit;
   bool _cfg_err; 
   
   // State
