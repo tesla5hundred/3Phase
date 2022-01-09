@@ -45,7 +45,9 @@
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
+ADC_HandleTypeDef hadc2;
 DMA_HandleTypeDef hdma_adc1;
+DMA_HandleTypeDef hdma_adc2;
 
 ETH_HandleTypeDef heth;
 
@@ -56,7 +58,9 @@ UART_HandleTypeDef huart3;
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 /* USER CODE BEGIN PV */
-volatile uint16_t AD_RES[6] = {0};
+volatile uint16_t AD_RES[3] = {0};
+volatile uint16_t AD_RES_2[2] = {0};
+volatile uint8_t initDone = 0;
 /*
 float Kp=5, Ki=0.5*18000, Kd=0.0, Hz=18000;
 int output_bits = 16;
@@ -81,6 +85,7 @@ static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_ADC1_Init(void);
+static void MX_ADC2_Init(void);
 /* USER CODE BEGIN PFP */
 void HAL_ADC_ConvtCpltCallback (ADC_HandleTypeDef *hadc);
 /* USER CODE END PFP */
@@ -124,6 +129,7 @@ int main(void)
   MX_USB_OTG_FS_PCD_Init();
   MX_TIM1_Init();
   MX_ADC1_Init();
+  MX_ADC2_Init();
   /* USER CODE BEGIN 2 */
 
 
@@ -150,6 +156,8 @@ int main(void)
   //HAL_TIM_PWM_Start_IT(&htim1, TIM_CHANNEL_1);
   HAL_TIM_Base_Start_IT(&htim1);
   HAL_TIMEx_OCN_Start(&htim1, TIM_CHANNEL_1);
+  HAL_TIMEx_OCN_Start(&htim1, TIM_CHANNEL_2);
+  HAL_TIMEx_OCN_Start(&htim1, TIM_CHANNEL_3);
 
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
@@ -157,7 +165,17 @@ int main(void)
 
   HAL_ADC_Start_DMA(&hadc1, (uint32_t *)&AD_RES, 3);
 
+  HAL_ADC_Start_DMA(&hadc2, (uint32_t *)&AD_RES_2, 2);
+  /*
+  SET_BIT(hadc2.Instance->CFGR, ADC_CFGR_DMAEN); //Enable DMA transfer for ADC slave (ADC12_CCR.MDMA = 0b00 -> MDMA mode disabled)
+  HAL_DMA_Start(hadc2.DMA_Handle,(uint32_t)&hadc2.Instance->DR, (uint32_t)adcbufS,ADCBUFSIZE); //Start ADC slave DMA
 
+  HAL_ADC_Calibration_Start()
+
+  SET_BIT(hadc1.Instance->CFGR, ADC_CFGR_DMAEN); //Enable DMA transfer for ADC master (ADC12_CCR.MDMA = 0b00 -> MDMA mode disabled)
+
+  HAL_ADCEx_MultiModeStart_DMA(&hadc1,(uint32_t *)adcbufM,ADCBUFSIZE); //Start ADC interleaved mode
+*/
   //*********************************************************************************
   // Prototypes
   //*********************************************************************************
@@ -195,6 +213,8 @@ int main(void)
 		  1.0/18000.0/*sampleTimeSeconds*/,
 		  -1.0/*minOutput*/, 1.0/*maxOutput*/,
 		  AUTOMATIC /*mode*/, DIRECT /*controllerDirection*/);
+
+  initDone = 1;
 
   /* USER CODE END 2 */
 
@@ -331,6 +351,64 @@ static void MX_ADC1_Init(void)
 }
 
 /**
+  * @brief ADC2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC2_Init(void)
+{
+
+  /* USER CODE BEGIN ADC2_Init 0 */
+
+  /* USER CODE END ADC2_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC2_Init 1 */
+
+  /* USER CODE END ADC2_Init 1 */
+  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+  */
+  hadc2.Instance = ADC2;
+  hadc2.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+  hadc2.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc2.Init.ScanConvMode = ENABLE;
+  hadc2.Init.ContinuousConvMode = DISABLE;
+  hadc2.Init.DiscontinuousConvMode = DISABLE;
+  hadc2.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc2.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc2.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc2.Init.NbrOfConversion = 2;
+  hadc2.Init.DMAContinuousRequests = ENABLE;
+  hadc2.Init.EOCSelection = ADC_EOC_SEQ_CONV;
+  if (HAL_ADC_Init(&hadc2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_3;
+  sConfig.Rank = 1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_5;
+  sConfig.Rank = 2;
+  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC2_Init 2 */
+
+  /* USER CODE END ADC2_Init 2 */
+
+}
+
+/**
   * @brief ETH Initialization Function
   * @param None
   * @retval None
@@ -431,12 +509,12 @@ static void MX_TIM1_Init(void)
   {
     Error_Handler();
   }
-  sConfigOC.Pulse = 32768;
+  sConfigOC.Pulse = 512;
   if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
   {
     Error_Handler();
   }
-  sConfigOC.Pulse = 50000;
+  sConfigOC.Pulse = 256;
   if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
   {
     Error_Handler();
@@ -540,6 +618,9 @@ static void MX_DMA_Init(void)
   /* DMA2_Stream0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
+  /* DMA2_Stream2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
 
 }
 
@@ -611,16 +692,27 @@ static void MX_GPIO_Init(void)
 #define INTEGER_PID
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
+	static uint32_t b;
 //	static float theta, vOut = 8.0, ffGain = 0.0;
 //	float setpoint;
 //	float iRef;
 //	HAL_GPIO_WritePin(GPIOTest_GPIO_Port, GPIOTest_Pin, GPIO_PIN_SET);
 
+	//If this is the callback for ADC2, return
+	if(hadc == &hadc2)
+		return;
+	/*
+	uint32_t a = (uint32_t)hadc;
 
+	if(a != b)
+	{
+		b = a;
+	}
+	*/
 	//7.4us to get to here from ADC conversion start
 	//4.7 opt
 #ifdef INTEGER_PID
-	loop(AD_RES[1], AD_RES[0], AD_RES[2]);
+	loop(AD_RES[1], AD_RES[0], AD_RES_2[1], AD_RES_2[0], AD_RES[2]);
 	HAL_GPIO_WritePin(GPIOTest_GPIO_Port, GPIOTest_Pin, GPIO_PIN_RESET);
 	//12.2us to get to here from ADC conversion start
 	//7us opt
@@ -675,11 +767,21 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 		*/
 }
 
-
+#define STRICT_HAL
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	HAL_GPIO_WritePin(GPIOTest_GPIO_Port, GPIOTest_Pin, GPIO_PIN_SET);
-	HAL_ADC_Start(&hadc1);
+	if(initDone)
+	{
+#ifdef STRICT_HAL
+		HAL_ADC_Start(&hadc1);
+		HAL_ADC_Start(&hadc2);
+#else
+        //Start conversions for all ADCs
+		hadc1.Instance->CR2 |= (uint32_t)ADC_CR2_SWSTART;
+		hadc2.Instance->CR2 |= (uint32_t)ADC_CR2_SWSTART;
+#endif
+	}
 
 //	HAL_GPIO_TogglePin(GPIOTest_GPIO_Port, GPIOTest_Pin);
 }
