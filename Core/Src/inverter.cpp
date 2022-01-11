@@ -12,14 +12,14 @@
 #include "stm32f4xx_hal.h"
 #include "fpsin.h"
 
-float Kp=1, Ki=0.016*18000, Kd=0.0, Hz=18000;
+float Kp=1, Ki=0.02*18000, Kd=0.0, Hz=18000;
 int output_bits = 16;
 bool output_signed = true;
 
 FastPID pid_i(Kp, Ki, Kd, Hz, output_bits, output_signed);
 FastPID pid_i_2(Kp, Ki, Kd, Hz, output_bits, output_signed);
 
-float Kp_v=0.16*4, Ki_v=0.02*18000, Kd_v=0.0;
+float Kp_v=0.16*4, Ki_v=0.01*18000, Kd_v=0.0;
 
 FastPID pid_v(Kp_v, Ki_v, Kd_v, Hz, output_bits, output_signed);
 FastPID pid_v_2(Kp_v, Ki_v, Kd_v, Hz, output_bits, output_signed);
