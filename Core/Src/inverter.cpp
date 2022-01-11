@@ -12,21 +12,21 @@
 #include "stm32f4xx_hal.h"
 #include "fpsin.h"
 
-float Kp=15, Ki=0.5*18000, Kd=0.0, Hz=18000;
+float Kp=1, Ki=0.016*18000, Kd=0.0, Hz=18000;
 int output_bits = 16;
 bool output_signed = true;
 
 FastPID pid_i(Kp, Ki, Kd, Hz, output_bits, output_signed);
 FastPID pid_i_2(Kp, Ki, Kd, Hz, output_bits, output_signed);
 
-float Kp_v=0.08, Ki_v=0.02*18000, Kd_v=0.0;
+float Kp_v=0.16*4, Ki_v=0.02*18000, Kd_v=0.0;
 
 FastPID pid_v(Kp_v, Ki_v, Kd_v, Hz, output_bits, output_signed);
 FastPID pid_v_2(Kp_v, Ki_v, Kd_v, Hz, output_bits, output_signed);
 
 void inverterInit(void)
 {
-	pid_i.setOutputRange(100, PWM_FS - 100);
+	pid_i.setOutputRange(40, PWM_FS - 40);
 
 	if (pid_i.err())
 	{
@@ -42,7 +42,7 @@ void inverterInit(void)
 	  for (;;) {};
 	}
 
-	pid_i_2.setOutputRange(100, PWM_FS - 100);
+	pid_i_2.setOutputRange(40, PWM_FS - 40);	//The lower the first value, the closer the output can get to full. This effects the bootstrap cap charging
 
 	if (pid_i.err())
 	{
@@ -67,8 +67,8 @@ void loop(uint16_t vMeas, uint16_t iMeas, uint16_t vMeas2, uint16_t iMeas2, uint
 	static int16_t iTheta = 0;
 	const int16_t thetaIncrement = (int16_t)(32768.0*60.0*2.0*(float)PWM_FS/(float)PWM_CLK);
 
-	int16_t iref =  (uint16_t)pid_v.step(fpsin(iTheta)*16*50/4096 + 30*50, vMeas);	//Setpoint scaling: 0 = 0V,  4095 = 83V; 50 = 1V
-	int16_t iref2 =  (uint16_t)pid_v_2.step(fpsin(iTheta+16384)*16*50/4096 + 30*50, vMeas2);	//Setpoint scaling: 0 = 0V,  4095 = 83V; 50 = 1V
+	int16_t iref =  (uint16_t)pid_v.step(fpsin(iTheta)*29*50/4096 + 35*50, vMeas);	//Setpoint scaling: 0 = 0V,  4095 = 83V; 50 = 1V
+	int16_t iref2 =  (uint16_t)pid_v_2.step(fpsin(iTheta+16384)*29*50/4096 + 35*50, vMeas2);	//Setpoint scaling: 0 = 0V,  4095 = 83V; 50 = 1V
 //	int16_t iref = 2140 + 14 * SQUARE_WAVE(iTheta);//forceIRef;
 //	int16_t iref =  (uint16_t)pid_v.step((uint16_t)((8.0*sin(theta)+24.0)*50.0), vMeas);	//Setpoint scaling: 0 = 0V,  4095 = 83V; 50 = 1V
 
